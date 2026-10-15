@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhisperPixel - Sembunyikan Pesan Rahasia di Balik Foto (LSB Steganography)</title>
+  <meta name="description" content="Aplikasi steganografi LSB modern 100% client-side untuk menyembunyikan dan membaca pesan rahasia di dalam foto secara lossless tanpa server.">
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            cyber: {
+              bg: '#070A13',
+              card: '#0D1424',
+              cardHover: '#121C33',
+              border: '#1E293B',
+              neonTeal: '#00F2FE',
+              neonCyan: '#06B6D4',
+              neonEmerald: '#10B981',
+              neonGreen: '#00FF9D',
+              neonAmber: '#F59E0B',
+              neonRed: '#EF4444',
+            }
+          },
+          animation: {
+            'pulse-glow': 'pulseGlow 2.5s infinite ease-in-out',
+            'scanline': 'scanline 6s linear infinite',
+            'cyber-float': 'cyberFloat 4s ease-in-out infinite',
+          },
+          keyframes: {
+            pulseGlow: {
+              '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+              '50%': { opacity: '0.8', transform: 'scale(1.05)' },
+            },
+            scanline: {
+              '0%': { transform: 'translateY(-100%)' },
+              '100%': { transform: 'translateY(1000%)' },
+            },
+            cyberFloat: {
+              '0%, 100%': { transform: 'translateY(0px)' },
+              '50%': { transform: 'translateY(-6px)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom High-Tech Cyber Grid Background */
+    body {
+      background-color: #070A13;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 85% 60%, rgba(16, 185, 129, 0.06) 0%, transparent 45%),
+        radial-gradient(circle at 15% 75%, rgba(6, 182, 212, 0.06) 0%, transparent 45%),
+        linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+      min-height: 100vh;
+    }
+
+    /* Cyber Glow Shadows */
+    .glow-teal {
+      box-shadow: 0 0 25px -5px rgba(0, 242, 254, 0.25);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+    }
+    .glow-border-teal:hover {
+      box-shadow: 0 0 20px -3px rgba(0, 242, 254, 0.35);
+      border-color: rgba(0, 242, 254, 0.6);
+    }
+    .glow-border-emerald:hover {
+      box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.35);
+      border-color: rgba(16, 185, 129, 0.6);
+    }
+
+    /* Glassmorphism */
+    .glass-panel {
+      background: rgba(13, 20, 36, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #070A13;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1E293B;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #06B6D4;
+    }
+
+    /* Scanline Bar in Dropzone */
+    .scan-beam {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #00F2FE, transparent);
+      box-shadow: 0 0 10px #00F2FE;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .dropzone-active .scan-beam {
+      opacity: 1;
+      animation: scanbeam 2s ease-in-out infinite;
+    }
+    @keyframes scanbeam {
+      0% { top: 0%; }
+      50% { top: 100%; }
+      100% { top: 0%; }
+    }
+  </style>
+</head>
+<body class="text-slate-100 antialiased font-sans selection:bg-teal-500/30 selection:text-teal-200">
+
+  <!-- Ambient Glow Orbs -->
+  <div class="fixed top-12 left-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse-glow"></div>
+  <div class="fixed bottom-12 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -z-10 animate-pulse-glow" style="animation-delay: 1.5s;"></div>
+
+  <!-- Header / Navigation Bar -->
+  <header class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Logo & Brand -->
+      <div class="flex items-center gap-3">
+        <div class="relative flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 via-teal-500/10 to-emerald-500/20 border border-cyan-500/40 shadow-lg shadow-cyan-500/20">
+          <!-- Cyber Padlock + Pixel Chat Icon -->
+          <svg class="w-6 h-6 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            <circle cx="12" cy="16" r="1.5" fill="currentColor"></circle>
+          </svg>
+          <span class="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-950 animate-ping"></span>
+          <span class="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-950"></span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 via-teal-300 to-emerald-400">
+              WhisperPixel
+            </h1>
+            <span class="hidden sm:inline-block px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider font-semibold bg-cyan-950/80 text-cyan-400 border border-cyan-800/60 rounded">
+              LSB Engine v2.0
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 font-medium">
+            Sembunyikan Pesan Rahasia di Balik Foto
+          </p>
+        </div>
+      </div>
+
+      <!-- High-Tech Badges & Quick Action Controls -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <!-- Client-Side Zero Knowledge Badge -->
+        <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/90 border border-slate-700/60 text-[11px] text-slate-300 font-mono shadow-sm">
+          <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          <span class="text-emerald-400 font-semibold">100% Client-Side</span>
+          <span class="text-slate-500">|</span>
+          <span class="hidden md:inline text-slate-400">Tanpa Server</span>
+        </div>
+
+        <!-- Audio FX Toggle Button -->
+        <button id="toggleAudioBtn" title="Toggle Efek Suara Cyber" class="p-2 rounded-lg bg-slate-900 border border-slate-700/60 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/50 transition-all text-xs flex items-center gap-1.5">
+          <svg id="audioIconOn" class="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+          <svg id="audioIconOff" class="w-4 h-4 text-slate-500 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="1" y1="1" x2="23" y2="23"></line>
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          </svg>
+          <span class="hidden sm:inline text-xs font-mono" id="audioLabel">SFX On</span>
+        </button>
+
+        <!-- Cara Kerja / Modal Explainer Button -->
+        <button id="openGuideBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/60 border border-cyan-800/70 hover:bg-cyan-900/50 text-cyan-300 hover:text-cyan-200 text-xs font-medium transition-all">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span>Cara Kerja LSB</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- CRITICAL NOTICE / WARNING BANNER (High Visibility) -->
+    <section class="relative overflow-hidden rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-slate-900/90 to-red-950/30 p-4 shadow-xl shadow-amber-950/20">
+      <div class="flex items-start gap-3.5">
+        <div class="flex-shrink-0 mt-0.5 p-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400">
+          <svg class="w-5 h-5 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </div>
+        <div class="flex-1 text-sm">
+          <h2 class="font-bold text-amber-300 flex items-center gap-2 text-sm sm:text-base">
+            <span>🚨 Penting: Selalu Kirim File Hasil Download Sebagai "Dokumen"!</span>
+          </h2>
+          <p class="text-slate-300 mt-1 leading-relaxed text-xs sm:text-sm">
+            Saat mengirim via <span class="text-emerald-400 font-semibold">WhatsApp</span>, <span class="text-cyan-400 font-semibold">Telegram</span>, Discord, dll., <strong class="text-amber-200 underline underline-offset-2">wajib lampirkan sebagai Dokumen (File)</strong>, bukan sebagai Gambar/Galeri. Jika dikirim sebagai gambar biasa, aplikasi akan mengompresi foto menjadi format JPEG/WebP yang otomatis <em>menghancurkan bit rahasia (LSB)</em>!
+          </p>
+        </div>
+        <button id="dismissNoticeBtn" class="text-slate-400 hover:text-slate-200 p-1 rounded-md text-xs" title="Tutup Peringatan">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- TWO-COLUMN WORKBENCH LAYOUT -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
+
+      <!-- ========================================== -->
+      <!-- COLUMN 1: SEMBUNYIKAN PESAN (ENCODE)      -->
+      <!-- ========================================== -->
+      <section class="glass-panel rounded-2xl p-5 sm:p-6 border border-slate-800 glow-border-emerald transition-all duration-300 relative">
+        
+        <!-- Column Header -->
+        <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-400 shadow-md shadow-emerald-950/50">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <div>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-emerald-400 font-semibold">Langkah 1</span>
+              <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                Sembunyikan Pesan (Encode)
+              </h2>
+            </div>
+          </div>
+          <!-- Quick Demo Generator -->
+          <button id="generateSampleBtn" class="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700/80 text-slate-300 hover:text-emerald-300 border border-slate-700 font-mono transition-all flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+            </svg>
+            <span>Foto Contoh</span>
+          </button>
+        </div>
+
+        <div class="space-y-5">
+
+          <!-- Dropzone 1: Upload Carrier Image -->
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-2 font-semibold flex items-center justify-between">
+              <span>1. Unggah Foto Wadah (.PNG / .JPG)</span>
+              <span id="encodeImageStatus" class="text-slate-500 font-normal">Belum ada foto</span>
+            </label>
+            
+            <div id="encodeDropzone" class="relative group cursor-pointer border-2 border-dashed border-slate-700/80 hover:border-emerald-500/70 rounded-xl p-5 text-center transition-all bg-slate-900/50 hover:bg-emerald-950/10 overflow-hidden">
+              <div class="scan-beam"></div>
+              <input type="file" id="encodeFileInput" accept="image/png, image/jpeg, image/jpg" class="hidden">
+              
+              <!-- Empty State in Dropzone -->
+              <div id="encodeEmptyState" class="py-4 space-y-3">
+                <div class="w-12 h-12 mx-auto rounded-full bg-slate-800/80 group-hover:bg-emerald-950/50 border border-slate-700 group-hover:border-emerald-500/50 flex items-center justify-center text-slate-400 group-hover:text-emerald-400 transition-all shadow-inner">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-slate-200 group-hover:text-emerald-300">
+                    Tarik & Lepas Foto ke Sini, atau <span class="text-emerald-400 underline underline-offset-4">Jelajahi</span>
+                  </p>
+                  <p class="text-xs text-slate-400 mt-1 font-mono">
+                    Mendukung format PNG, JPG, JPEG (Maks. 25 MB)
+                  </p>
+                </div>
+              </div>
+
+              <!-- Loaded Preview State in Dropzone -->
+              <div id="encodePreviewState" class="hidden text-left space-y-3">
+                <div class="flex items-center gap-4">
+                  <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-emerald-500/50 bg-slate-950 flex-shrink-0 shadow-md">
+                    <img id="encodeImagePreview" src="" alt="Carrier Preview" class="w-full h-full object-cover">
+                    <span class="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[10px] text-center font-mono text-emerald-400 py-0.5 border-t border-slate-800">
+                      ORIGINAL
+                    </span>
+                  </div>
+                  <div class="flex-1 min-w-0 space-y-1">
+                    <div class="flex items-center justify-between">
+                      <p id="encodeFileName" class="text-sm font-semibold text-white truncate font-mono">foto.png</p>
+                      <button id="removeEncodeImgBtn" class="text-xs text-red-400 hover:text-red-300 p-1 hover:bg-red-950/40 rounded transition-colors" title="Hapus foto">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
+                      <div>
+                        <span class="text-slate-500">Resolusi:</span>
+                        <span id="encodeResolution" class="text-emerald-400 font-semibold">-</span>
+                      </div>
+                      <div>
+                        <span class="text-slate-500">Ukuran:</span>
+                        <span id="encodeFileSize" class="text-slate-300">-</span>
+                      </div>
+                      <div class="col-span-2">
+                        <span class="text-slate-500">Kapasitas Maks:</span>
+                        <span id="encodeMaxCapacity" class="text-emerald-300 font-semibold">-</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Feature 2: Secret Textarea -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label for="secretMessageInput" class="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>2. Tulis Pesan Rahasia Anda</span>
+              </label>
+              <div class="flex items-center gap-2">
+                <button id="sampleMessageBtn" class="text-[11px] text-cyan-400 hover:text-cyan-300 font-mono underline underline-offset-2">
+                  Contoh Teks
+                </button>
+                <span class="text-slate-600">|</span>
+                <button id="clearMessageBtn" class="text-[11px] text-slate-400 hover:text-red-400 font-mono">
+                  Bersihkan
+                </button>
+              </div>
+            </div>
+
+            <div class="relative">
+              <textarea id="secretMessageInput" rows="5" placeholder="Tuliskan pesan super rahasia di sini... (contoh: password brankas, koordinat GPS, catatan pribadi)" 
+                class="w-full rounded-xl bg-slate-950/70 border border-slate-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 p-3.5 text-sm text-slate-100 placeholder-slate-500 font-sans resize-y transition-all outline-none"></textarea>
+            </div>
+
+            <!-- Capacity & Character Meter -->
+            <div class="mt-2.5 space-y-1.5">
+              <div class="flex items-center justify-between text-xs font-mono">
+                <span class="text-slate-400 flex items-center gap-1">
+                  <span>Kapasitas Terpakai:</span>
+                  <span id="capacityPercentText" class="text-emerald-400 font-semibold">0%</span>
+                </span>
+                <span class="text-slate-400">
+                  <span id="charCount" class="text-white font-semibold">0</span>
+                  <span id="charCapacity" class="text-slate-500"> / 0 karakter</span>
+                </span>
+              </div>
+              <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div id="capacityBar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width: 0%;"></div>
+              </div>
+              <div id="capacityWarning" class="hidden text-xs text-red-400 font-mono flex items-center gap-1 mt-1">
+                <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>Peringatan: Ukuran pesan melebihi kapasitas piksel foto! Kurangi panjang teks atau gunakan resolusi foto lebih tinggi.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Button: Encode & Download -->
+          <div>
+            <button id="encodeBtn" disabled 
+              class="w-full relative group overflow-hidden rounded-xl py-3.5 px-6 font-bold text-sm tracking-wide text-slate-950 bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 hover:from-emerald-300 hover:to-teal-300 shadow-lg shadow-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 flex items-center justify-center gap-2">
+              
+              <!-- Spinner during encoding -->
+              <svg id="encodeSpinner" class="w-5 h-5 animate-spin hidden text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                <path d="M12 2a10 10 0 0 1 10 10"></path>
+              </svg>
+
+              <!-- Main Button Content -->
+              <svg id="encodeBtnIcon" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span id="encodeBtnText">Proses & Unduh Foto (PNG)</span>
+            </button>
+
+            <!-- Status message container -->
+            <div id="encodeStatusAlert" class="hidden mt-3 p-3 rounded-xl text-xs font-mono flex items-center justify-between border transition-all">
+              <span id="encodeStatusMessage" class="flex items-center gap-2"></span>
+              <button id="quickTestDecodeBtn" class="hidden text-xs bg-cyan-900/80 hover:bg-cyan-800 text-cyan-200 px-2.5 py-1 rounded font-sans transition-all">
+                Uji di Kolom Dekripsi &rarr;
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+
+      <!-- ========================================== -->
+      <!-- COLUMN 2: BACA PESAN (DECODE)             -->
+      <!-- ========================================== -->
+      <section class="glass-panel rounded-2xl p-5 sm:p-6 border border-slate-800 glow-border-teal transition-all duration-300 relative">
+        
+        <!-- Column Header -->
+        <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="p-2.5 rounded-xl bg-cyan-950/70 border border-cyan-500/40 text-cyan-400 shadow-md shadow-cyan-950/50">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </div>
+            <div>
+              <span class="text-[11px] font-mono uppercase tracking-wider text-cyan-400 font-semibold">Langkah 2</span>
+              <h2 class="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                Baca Pesan (Decode)
+              </h2>
+            </div>
+          </div>
+          <!-- Clean status badge -->
+          <span class="text-xs font-mono text-cyan-400 px-2.5 py-1 rounded-lg bg-cyan-950/50 border border-cyan-800/60">
+            Ekstraksi LSB
+          </span>
+        </div>
+
+        <div class="space-y-5">
+
+          <!-- Dropzone 2: Upload Secret/Stego Image -->
+          <div>
+            <label class="block text-xs font-mono uppercase tracking-wider text-slate-400 mb-2 font-semibold flex items-center justify-between">
+              <span>1. Unggah Foto Rahasia (.PNG)</span>
+              <span id="decodeImageStatus" class="text-slate-500 font-normal">Belum ada foto</span>
+            </label>
+            
+            <div id="decodeDropzone" class="relative group cursor-pointer border-2 border-dashed border-slate-700/80 hover:border-cyan-500/70 rounded-xl p-5 text-center transition-all bg-slate-900/50 hover:bg-cyan-950/10 overflow-hidden">
+              <div class="scan-beam"></div>
+              <input type="file" id="decodeFileInput" accept="image/png, image/jpeg, image/jpg" class="hidden">
+              
+              <!-- Empty State in Decode Dropzone -->
+              <div id="decodeEmptyState" class="py-4 space-y-3">
+                <div class="w-12 h-12 mx-auto rounded-full bg-slate-800/80 group-hover:bg-cyan-950/50 border border-slate-700 group-hover:border-cyan-500/50 flex items-center justify-center text-slate-400 group-hover:text-cyan-400 transition-all shadow-inner">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-sm font-semibold text-slate-200 group-hover:text-cyan-300">
+                    Tarik Foto Rahasia ke Sini, atau <span class="text-cyan-400 underline underline-offset-4">Jelajahi</span>
+                  </p>
+                  <p class="text-xs text-slate-400 mt-1 font-mono">
+                    Format disarankan: PNG asli tanpa kompresi
+                  </p>
+                </div>
+              </div>
+
+              <!-- Loaded Preview State in Decode Dropzone -->
+              <div id="decodePreviewState" class="hidden text-left space-y-3">
+                <div class="flex items-center gap-4">
+                  <div class="relative w-20 h-20 sm:w-24 sm:h-24 rounded-lg overflow-hidden border border-cyan-500/50 bg-slate-950 flex-shrink-0 shadow-md">
+                    <img id="decodeImagePreview" src="" alt="Secret Stego Preview" class="w-full h-full object-cover">
+                    <span class="absolute bottom-0 inset-x-0 bg-slate-950/80 text-[10px] text-center font-mono text-cyan-400 py-0.5 border-t border-slate-800">
+                      STEGO
+                    </span>
+                  </div>
+                  <div class="flex-1 min-w-0 space-y-1">
+                    <div class="flex items-center justify-between">
+                      <p id="decodeFileName" class="text-sm font-semibold text-white truncate font-mono">rahasia.png</p>
+                      <button id="removeDecodeImgBtn" class="text-xs text-red-400 hover:text-red-300 p-1 hover:bg-red-950/40 rounded transition-colors" title="Hapus foto">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                      </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
+                      <div>
+                        <span class="text-slate-500">Resolusi:</span>
+                        <span id="decodeResolution" class="text-cyan-400 font-semibold">-</span>
+                      </div>
+                      <div>
+                        <span class="text-slate-500">Ukuran:</span>
+                        <span id="decodeFileSize" class="text-slate-300">-</span>
+                      </div>
+                      <div class="col-span-2">
+                        <span class="text-slate-500">Status File:</span>
+                        <span class="text-slate-200">Siap diekstraksi</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Feature 2: Disclosed Message Output Area -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M2 18h20"></path>
+                  <path d="M5 10v4"></path>
+                  <path d="M19 10v4"></path>
+                  <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                </svg>
+                <span>2. Hasil Dekripsi Pesan</span>
+              </label>
+
+              <!-- Copy to Clipboard Button -->
+              <button id="copyMessageBtn" disabled 
+                class="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono text-slate-300 hover:text-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+                <svg id="copyIcon" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span id="copyBtnText">Salin Teks</span>
+              </button>
+            </div>
+
+            <!-- Display Container: Locked vs Unlocked -->
+            <div class="relative min-h-[140px] rounded-xl bg-slate-950/70 border border-slate-700/80 p-4 transition-all">
+              
+              <!-- Locked State Placeholder -->
+              <div id="lockedStateContainer" class="flex flex-col items-center justify-center py-6 text-center space-y-3">
+                <div class="w-12 h-12 rounded-full bg-slate-900 border border-slate-700/80 flex items-center justify-center text-slate-500 animate-cyber-float">
+                  <svg class="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                </div>
+                <div class="space-y-1">
+                  <p class="text-sm font-semibold text-slate-300">Pesan Terkunci...</p>
+                  <p class="text-xs text-slate-500 max-w-xs">
+                    Unggah gambar stego dan klik tombol <span class="text-cyan-400">"Buka Pesan"</span> di bawah untuk mendekripsi data tersembunyi.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Unlocked Secret Message Display -->
+              <div id="unlockedMessageContainer" class="hidden space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800 text-[11px] font-mono text-slate-400">
+                  <span class="text-emerald-400 flex items-center gap-1.5 font-semibold">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Pesan Berhasil Dibuka
+                  </span>
+                  <span id="decodedMeta" class="text-slate-400 font-mono">0 karakter</span>
+                </div>
+                <div id="decodedOutputText" class="text-sm font-sans text-slate-100 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto pr-2 select-text"></div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Action Button: Decode -->
+          <div>
+            <button id="decodeBtn" disabled 
+              class="w-full relative group overflow-hidden rounded-xl py-3.5 px-6 font-bold text-sm tracking-wide text-slate-950 bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-400 hover:from-cyan-300 hover:to-blue-300 shadow-lg shadow-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 flex items-center justify-center gap-2">
+              
+              <!-- Spinner during decoding -->
+              <svg id="decodeSpinner" class="w-5 h-5 animate-spin hidden text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                <path d="M12 2a10 10 0 0 1 10 10"></path>
+              </svg>
+
+              <!-- Main Button Content -->
+              <svg id="decodeBtnIcon" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <span id="decodeBtnText">Buka Pesan</span>
+            </button>
+
+            <!-- Status message container -->
+            <div id="decodeStatusAlert" class="hidden mt-3 p-3 rounded-xl text-xs font-mono flex items-center gap-2 border transition-all"></div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+
+    <!-- STEGANOGRAPHY TECH EXPLAINER (Bottom Section) -->
+    <section class="glass-panel rounded-2xl p-6 border border-slate-800 text-slate-300">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+        <div>
+          <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+            <span>Bagaimana WhisperPixel Bekerja? (Teknologi LSB)</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Mekanisme penyembunyian data rahasia pada level bit warna terkecil tanpa mengubah tampilan visual gambar.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-800">
+            3 Bits per Pixel (RGB)
+          </span>
+          <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-mono bg-emerald-950/60 text-emerald-300 border border-emerald-800">
+            Delta Warna &lt; 0.39%
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5 text-xs leading-relaxed">
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-2">
+          <div class="text-emerald-400 font-mono font-semibold text-sm flex items-center gap-1.5">
+            <span>01. Konversi Biner & Delimiter</span>
+          </div>
+          <p class="text-slate-400">
+            Pesan rahasia diubah menjadi deretan bit 8-bit UTF-8 (mendukung teks, emoji, simbol). Di bagian akhir, dibubuhkan penanda khusus (<code class="text-cyan-300 bg-slate-950 px-1 py-0.5 rounded">###END###</code>) agar decoder mengetahui kapan pembacaan harus berhenti.
+          </p>
+        </div>
+
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-2">
+          <div class="text-cyan-400 font-mono font-semibold text-sm flex items-center gap-1.5">
+            <span>02. Penyisipan Bit LSB</span>
+          </div>
+          <p class="text-slate-400">
+            Piksel foto terdiri dari kanal <strong class="text-slate-200">R, G, B</strong> (Alpha dibiarkan utuh). Bit terakhir (Least Significant Bit) diganti dengan bit rahasia. Perubahan nilai warna hanya sebesar 1 dari 255 (0,39%), sehingga mata manusia tidak dapat melihat perbedaannya.
+          </p>
+        </div>
+
+        <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-2">
+          <div class="text-amber-400 font-mono font-semibold text-sm flex items-center gap-1.5">
+            <span>03. Format Lossless (PNG)</span>
+          </div>
+          <p class="text-slate-400">
+            Hasil diunduh sebagai format <strong class="text-slate-200">PNG lossless</strong> yang menjamin nilai piksel tidak terkompresi. Bila diubah menjadi JPG atau dikirim via WhatsApp tanpa fitur "Dokumen", kompresi lossy akan merusak susunan bit LSB tersebut.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Interactive Educational Modal: Deep Dive LSB Explainer -->
+  <div id="guideModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="glass-panel border border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <svg class="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+          </svg>
+          <span>Panduan Algoritma LSB (Least Significant Bit)</span>
+        </h3>
+        <button id="closeGuideModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed font-sans max-h-[70vh] overflow-y-auto pr-1">
+        <p>
+          <strong>Steganografi</strong> adalah seni menyembunyikan informasi di dalam media lain sedemikian rupa sehingga pihak ketiga bahkan tidak menyadari bahwa ada pesan yang disembunyikan. Berbeda dari kriptografi (yang membuat pesan menjadi tidak terbaca tetapi terlihat mencurigakan), steganografi menyamarkan keberadaan pesan itu sendiri.
+        </p>
+
+        <!-- Interactive Diagram Box -->
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-cyan-500/30 font-mono text-xs space-y-2">
+          <div class="text-cyan-400 font-bold">// Contoh Penggantian Bit pada Satu Nilai Warna (Kanal Merah):</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-300">
+            <div class="p-2.5 rounded bg-slate-900 border border-slate-800">
+              <span class="text-slate-400">Nilai Awal (214):</span><br>
+              <span class="text-emerald-400 font-bold">1 1 0 1 0 1 1 </span><span class="text-amber-400 font-bold underline">0</span> (LSB = 0)
+            </div>
+            <div class="p-2.5 rounded bg-slate-900 border border-slate-800">
+              <span class="text-slate-400">Pesan Bit: <strong class="text-cyan-400">1</strong></span><br>
+              <span class="text-emerald-400 font-bold">1 1 0 1 0 1 1 </span><span class="text-cyan-400 font-bold underline">1</span> (Nilai jadi 215)
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 pt-1">
+            Selisih warna: hanya 1 poin dari total rentang 0-255. Mata manusia tidak dapat membedakan nilai merah 214 vs 215!
+          </p>
+        </div>
+
+        <div class="space-y-2">
+          <h4 class="font-bold text-white text-sm">💡 Tips Keberhasilan Steganografi:</h4>
+          <ul class="list-disc list-inside space-y-1 text-slate-400 text-xs sm:text-sm">
+            <li>Gunakan foto dengan resolusi cukup besar (misal 1000×1000 piksel menampung hingga ~375.000 karakter).</li>
+            <li>Hasil unduhan selalu berformat <strong>PNG lossless</strong>.</li>
+            <li>Jangan pernah meng-upload foto hasil steganografi ke platform yang melakukan kompresi otomatis (misalnya status WhatsApp, upload Facebook biasa) tanpa opsi dokumen mentah.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="pt-2 text-right">
+        <button id="closeGuideModalBtn2" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs sm:text-sm transition-all shadow-md">
+          Saya Mengerti
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Hidden Working Offscreen Canvas -->
+  <canvas id="offscreenCanvas" class="hidden"></canvas>
+
+
+  <!-- JAVASCRIPT LOGIC (Vanilla JS) -->
+  <script>
+    /**
+     * WhisperPixel - Client-Side LSB Steganography Engine
+     */
+
+    // --- Audio Synthesis SFX (Web Audio API) ---
+    class CyberAudio {
+      constructor() {
+        this.enabled = true;
+        this.ctx = null;
+      }
+      init() {
+        if (!this.ctx && (window.AudioContext || window.webkitAudioContext)) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+        }
+      }
+      playBlip(freq = 880, type = 'sine', duration = 0.08) {
+        if (!this.enabled) return;
+        try {
+          this.init();
+          if (!this.ctx) return;
+          if (this.ctx.state === 'suspended') this.ctx.resume();
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {
+          // Silent fallback
+        }
+      }
+      playSuccess() {
+        if (!this.enabled) return;
+        this.playBlip(587.33, 'triangle', 0.1);
+        setTimeout(() => this.playBlip(880, 'sine', 0.15), 100);
+      }
+      playDecodeSuccess() {
+        if (!this.enabled) return;
+        this.playBlip(523.25, 'sine', 0.08);
+        setTimeout(() => this.playBlip(659.25, 'sine', 0.08), 80);
+        setTimeout(() => this.playBlip(1046.5, 'triangle', 0.18), 160);
+      }
+      playError() {
+        if (!this.enabled) return;
+        this.playBlip(220, 'sawtooth', 0.15);
+      }
+    }
+
+    const sound = new CyberAudio();
+
+    // Sentinel delimiter to mark the end of secret data
+    const SENTINEL_DELIMITER = "###END###";
+
+    // Global App State
+    const state = {
+      encode: {
+        file: null,
+        img: null,
+        width: 0,
+        height: 0,
+        maxCapacityBytes: 0,
+        lastProcessedBlobUrl: null,
+        lastFileName: 'pesan-rahasia.png',
+      },
+      decode: {
+        file: null,
+        img: null,
+        width: 0,
+        height: 0,
+        decodedMessage: '',
+      }
+    };
+
+    // DOM Elements - Navigation & Notice
+    const toggleAudioBtn = document.getElementById('toggleAudioBtn');
+    const audioIconOn = document.getElementById('audioIconOn');
+    const audioIconOff = document.getElementById('audioIconOff');
+    const audioLabel = document.getElementById('audioLabel');
+    const openGuideBtn = document.getElementById('openGuideBtn');
+    const closeGuideModalBtn = document.getElementById('closeGuideModalBtn');
+    const closeGuideModalBtn2 = document.getElementById('closeGuideModalBtn2');
+    const guideModal = document.getElementById('guideModal');
+    const dismissNoticeBtn = document.getElementById('dismissNoticeBtn');
+
+    // DOM Elements - Column 1 (Encode)
+    const encodeDropzone = document.getElementById('encodeDropzone');
+    const encodeFileInput = document.getElementById('encodeFileInput');
+    const encodeEmptyState = document.getElementById('encodeEmptyState');
+    const encodePreviewState = document.getElementById('encodePreviewState');
+    const encodeImagePreview = document.getElementById('encodeImagePreview');
+    const encodeFileName = document.getElementById('encodeFileName');
+    const encodeResolution = document.getElementById('encodeResolution');
+    const encodeFileSize = document.getElementById('encodeFileSize');
+    const encodeMaxCapacity = document.getElementById('encodeMaxCapacity');
+    const encodeImageStatus = document.getElementById('encodeImageStatus');
+    const removeEncodeImgBtn = document.getElementById('removeEncodeImgBtn');
+    const generateSampleBtn = document.getElementById('generateSampleBtn');
+
+    const secretMessageInput = document.getElementById('secretMessageInput');
+    const sampleMessageBtn = document.getElementById('sampleMessageBtn');
+    const clearMessageBtn = document.getElementById('clearMessageBtn');
+    const charCount = document.getElementById('charCount');
+    const charCapacity = document.getElementById('charCapacity');
+    const capacityPercentText = document.getElementById('capacityPercentText');
+    const capacityBar = document.getElementById('capacityBar');
+    const capacityWarning = document.getElementById('capacityWarning');
+
+    const encodeBtn = document.getElementById('encodeBtn');
+    const encodeSpinner = document.getElementById('encodeSpinner');
+    const encodeBtnIcon = document.getElementById('encodeBtnIcon');
+    const encodeBtnText = document.getElementById('encodeBtnText');
+    const encodeStatusAlert = document.getElementById('encodeStatusAlert');
+    const encodeStatusMessage = document.getElementById('encodeStatusMessage');
+    const quickTestDecodeBtn = document.getElementById('quickTestDecodeBtn');
+
+    // DOM Elements - Column 2 (Decode)
+    const decodeDropzone = document.getElementById('decodeDropzone');
+    const decodeFileInput = document.getElementById('decodeFileInput');
+    const decodeEmptyState = document.getElementById('decodeEmptyState');
+    const decodePreviewState = document.getElementById('decodePreviewState');
+    const decodeImagePreview = document.getElementById('decodeImagePreview');
+    const decodeFileName = document.getElementById('decodeFileName');
+    const decodeResolution = document.getElementById('decodeResolution');
+    const decodeFileSize = document.getElementById('decodeFileSize');
+    const decodeImageStatus = document.getElementById('decodeImageStatus');
+    const removeDecodeImgBtn = document.getElementById('removeDecodeImgBtn');
+
+    const lockedStateContainer = document.getElementById('lockedStateContainer');
+    const unlockedMessageContainer = document.getElementById('unlockedMessageContainer');
+    const decodedOutputText = document.getElementById('decodedOutputText');
+    const decodedMeta = document.getElementById('decodedMeta');
+    const copyMessageBtn = document.getElementById('copyMessageBtn');
+    const copyBtnText = document.getElementById('copyBtnText');
+    const copyIcon = document.getElementById('copyIcon');
+
+    const decodeBtn = document.getElementById('decodeBtn');
+    const decodeSpinner = document.getElementById('decodeSpinner');
+    const decodeBtnIcon = document.getElementById('decodeBtnIcon');
+    const decodeBtnText = document.getElementById('decodeBtnText');
+    const decodeStatusAlert = document.getElementById('decodeStatusAlert');
+
+    const toastContainer = document.getElementById('toastContainer');
+    const offscreenCanvas = document.getElementById('offscreenCanvas');
+    const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+
+
+    // --- Helper Utilities ---
+
+    // Format byte sizes into readable strings
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Modern Toast Notification
+    function showToast(message, type = 'info', duration = 3500) {
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl border text-xs sm:text-sm font-sans transition-all duration-300 transform translate-y-2 opacity-0 ${
+        type === 'success' ? 'bg-slate-900 border-emerald-500/60 text-emerald-300 shadow-emerald-950/40' :
+        type === 'error' ? 'bg-slate-900 border-red-500/60 text-red-300 shadow-red-950/40' :
+        type === 'warning' ? 'bg-slate-900 border-amber-500/60 text-amber-300 shadow-amber-950/40' :
+        'bg-slate-900 border-cyan-500/60 text-cyan-300 shadow-cyan-950/40'
+      }`;
+
+      let iconSvg = '';
+      if (type === 'success') {
+        iconSvg = `<svg class="w-4 h-4 text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      } else if (type === 'error') {
+        iconSvg = `<svg class="w-4 h-4 text-red-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
+      } else {
+        iconSvg = `<svg class="w-4 h-4 text-cyan-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      }
+
+      toast.innerHTML = `${iconSvg} <span>${message}</span>`;
+      toastContainer.appendChild(toast);
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+
+    // --- Audio Toggle Control ---
+    toggleAudioBtn.addEventListener('click', () => {
+      sound.enabled = !sound.enabled;
+      if (sound.enabled) {
+        audioIconOn.classList.remove('hidden');
+        audioIconOff.classList.add('hidden');
+        audioLabel.textContent = 'SFX On';
+        sound.playBlip(700, 'sine', 0.05);
+        showToast('Efek suara diaktifkan', 'info', 1800);
+      } else {
+        audioIconOn.classList.add('hidden');
+        audioIconOff.classList.remove('hidden');
+        audioLabel.textContent = 'SFX Mute';
+        showToast('Efek suara dibisukan', 'info', 1800);
+      }
+    });
+
+    // Notice Dismissal
+    dismissNoticeBtn.addEventListener('click', (e) => {
+      e.currentTarget.closest('section').style.display = 'none';
+      sound.playBlip(440, 'sine', 0.04);
+    });
+
+    // Guide Modal
+    function toggleGuideModal(show) {
+      if (show) {
+        guideModal.classList.remove('hidden');
+        sound.playBlip(600, 'sine', 0.05);
+      } else {
+        guideModal.classList.add('hidden');
+        sound.playBlip(450, 'sine', 0.04);
+      }
+    }
+    openGuideBtn.addEventListener('click', () => toggleGuideModal(true));
+    closeGuideModalBtn.addEventListener('click', () => toggleGuideModal(false));
+    closeGuideModalBtn2.addEventListener('click', () => toggleGuideModal(false));
+    guideModal.addEventListener('click', (e) => {
+      if (e.target === guideModal) toggleGuideModal(false);
+    });
+
+
+    // ========================================================
+    // COLUMN 1: ENCODE LOGIC & UI
+    // ========================================================
+
+    // Calculate max byte capacity based on image dimensions
+    function calculateCapacity(width, height) {
+      // 3 channels per pixel (R, G, B) can each carry 1 bit
+      const totalBits = width * height * 3;
+      const totalBytes = Math.floor(totalBits / 8);
+      const delimiterBytes = new TextEncoder().encode(SENTINEL_DELIMITER).length;
+      // Reserve delimiter bytes
+      return Math.max(0, totalBytes - delimiterBytes);
+    }
+
+    // Update Encode Capacity Progress Bar
+    function updateCapacityDisplay() {
+      const text = secretMessageInput.value;
+      const encoder = new TextEncoder();
+      const messageBytes = encoder.encode(text).length;
+
+      charCount.textContent = text.length.toLocaleString('id-ID');
+
+      if (!state.encode.img) {
+        charCapacity.textContent = ' / 0 karakter';
+        capacityPercentText.textContent = '0%';
+        capacityBar.style.width = '0%';
+        capacityBar.className = 'h-full bg-emerald-500 rounded-full transition-all duration-300';
+        capacityWarning.classList.add('hidden');
+        encodeBtn.disabled = true;
+        return;
+      }
+
+      const maxBytes = state.encode.maxCapacityBytes;
+      charCapacity.textContent = ` / ~${maxBytes.toLocaleString('id-ID')} karakter`;
+
+      if (maxBytes <= 0) {
+        capacityPercentText.textContent = '0%';
+        capacityBar.style.width = '0%';
+        encodeBtn.disabled = true;
+        return;
+      }
+
+      const percent = Math.min(100, (messageBytes / maxBytes) * 100);
+      capacityPercentText.textContent = `${percent.toFixed(2)}%`;
+      capacityBar.style.width = `${percent}%`;
+
+      if (messageBytes > maxBytes) {
+        capacityBar.className = 'h-full bg-red-500 rounded-full transition-all duration-300';
+        capacityWarning.classList.remove('hidden');
+        encodeBtn.disabled = true;
+      } else {
+        capacityWarning.classList.add('hidden');
+        if (percent > 85) {
+          capacityBar.className = 'h-full bg-amber-500 rounded-full transition-all duration-300';
+        } else {
+          capacityBar.className = 'h-full bg-emerald-500 rounded-full transition-all duration-300';
+        }
+        encodeBtn.disabled = text.trim().length === 0;
+      }
+    }
+
+    // Handle Encode File Selection
+    function handleEncodeFile(file) {
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('Silakan pilih file gambar yang valid (.png, .jpg, .jpeg)', 'error');
+        sound.playError();
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          state.encode.file = file;
+          state.encode.img = img;
+          state.encode.width = img.naturalWidth;
+          state.encode.height = img.naturalHeight;
+          state.encode.maxCapacityBytes = calculateCapacity(img.naturalWidth, img.naturalHeight);
+
+          // Update UI
+          encodeImagePreview.src = e.target.result;
+          encodeFileName.textContent = file.name;
+          encodeResolution.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+          encodeFileSize.textContent = formatBytes(file.size);
+          encodeMaxCapacity.textContent = `~${formatBytes(state.encode.maxCapacityBytes)} (${state.encode.maxCapacityBytes.toLocaleString('id-ID')} karakter)`;
+          encodeImageStatus.textContent = 'Foto siap';
+
+          encodeEmptyState.classList.add('hidden');
+          encodePreviewState.classList.remove('hidden');
+          encodeStatusAlert.classList.add('hidden');
+
+          updateCapacityDisplay();
+          sound.playBlip(750, 'sine', 0.08);
+          showToast(`Foto berhasil dimuat: ${img.naturalWidth}×${img.naturalHeight} px`, 'success');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Remove Encode Image
+    function resetEncodeImage() {
+      state.encode.file = null;
+      state.encode.img = null;
+      state.encode.width = 0;
+      state.encode.height = 0;
+      state.encode.maxCapacityBytes = 0;
+
+      encodeFileInput.value = '';
+      encodeImagePreview.src = '';
+      encodeEmptyState.classList.remove('hidden');
+      encodePreviewState.classList.add('hidden');
+      encodeImageStatus.textContent = 'Belum ada foto';
+      encodeStatusAlert.classList.add('hidden');
+
+      updateCapacityDisplay();
+      sound.playBlip(400, 'sine', 0.05);
+    }
+
+    removeEncodeImgBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetEncodeImage();
+    });
+
+    // Dropzone Events for Encode
+    encodeDropzone.addEventListener('click', () => encodeFileInput.click());
+    encodeFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleEncodeFile(e.target.files[0]);
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      encodeDropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        encodeDropzone.classList.add('border-emerald-400', 'bg-emerald-950/20', 'dropzone-active');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      encodeDropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        encodeDropzone.classList.remove('border-emerald-400', 'bg-emerald-950/20', 'dropzone-active');
+      });
+    });
+
+    encodeDropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length > 0) {
+        handleEncodeFile(dt.files[0]);
+      }
+    });
+
+    // Textarea Listeners
+    secretMessageInput.addEventListener('input', updateCapacityDisplay);
+
+    clearMessageBtn.addEventListener('click', () => {
+      secretMessageInput.value = '';
+      updateCapacityDisplay();
+      sound.playBlip(400, 'sine', 0.04);
+    });
+
+    sampleMessageBtn.addEventListener('click', () => {
+      const samples = [
+        "Operasi WhisperPixel: Dokumen rahasia disimpan di server pusat. Koordinat pertemuan: 6.2088° S, 106.8456° E. Kunci akses: NEON_PHOENIX_2026. 🤫🔐",
+        "Pesan rahasia: Kode brankas cadangan adalah 9482-1175. Harap segera amankan berkas fisik sebelum fajar! 🔥",
+        "Transmisi terenkripsi LSB 100% di browser tanpa jejak server. Privasi mutlak terjamin."
+      ];
+      const randomSample = samples[Math.floor(Math.random() * samples.length)];
+      secretMessageInput.value = randomSample;
+      updateCapacityDisplay();
+      sound.playBlip(680, 'sine', 0.05);
+      showToast('Contoh pesan rahasia disematkan', 'info');
+    });
+
+    // Generate Synthetic Sample Image for Quick Testing
+    generateSampleBtn.addEventListener('click', () => {
+      sound.playBlip(700, 'sine', 0.06);
+      showToast('Membuat foto sampel cyberpunk...', 'info', 1500);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 900;
+      canvas.height = 600;
+      const ctx = canvas.getContext('2d');
+
+      // Gradient Cyberpunk Background
+      const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      grad.addColorStop(0, '#0F172A');
+      grad.addColorStop(0.5, '#064E3B');
+      grad.addColorStop(1, '#0C4A6E');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Cyber Grid Lines
+      ctx.strokeStyle = 'rgba(0, 242, 254, 0.15)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      // Futuristic Glowing Center Shield Badge
+      ctx.save();
+      ctx.shadowColor = '#00F2FE';
+      ctx.shadowBlur = 25;
+      ctx.strokeStyle = '#00F2FE';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(450, 300, 110, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#10B981';
+      ctx.font = 'bold 32px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('WHISPER PIXEL', 450, 290);
+      ctx.fillStyle = '#00F2FE';
+      ctx.font = '16px monospace';
+      ctx.fillText('STEGO SAMPLE CARRIER', 450, 325);
+      ctx.restore();
+
+      canvas.toBlob((blob) => {
+        const file = new File([blob], 'whisperpixel-sampel.png', { type: 'image/png' });
+        handleEncodeFile(file);
+      }, 'image/png');
+    });
+
+
+    // --- LSB ENCODING PROCESSOR ---
+    encodeBtn.addEventListener('click', async () => {
+      if (!state.encode.img) {
+        showToast('Unggah foto terlebih dahulu!', 'warning');
+        sound.playError();
+        return;
+      }
+
+      const secretText = secretMessageInput.value.trim();
+      if (!secretText) {
+        showToast('Tulis pesan rahasia sebelum memproses!', 'warning');
+        sound.playError();
+        return;
+      }
+
+      // UI Loading state
+      encodeBtn.disabled = true;
+      encodeSpinner.classList.remove('hidden');
+      encodeBtnIcon.classList.add('hidden');
+      encodeBtnText.textContent = 'Menyuntikkan Pesan ke Piksel...';
+      sound.playBlip(550, 'sine', 0.05);
+
+      // Give browser a frame to render loading UI
+      await new Promise(r => setTimeout(r, 60));
+
+      try {
+        const { width, height, img } = state.encode;
+        offscreenCanvas.width = width;
+        offscreenCanvas.height = height;
+        offscreenCtx.drawImage(img, 0, 0);
+
+        const imgData = offscreenCtx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+
+        // Encode message + sentinel delimiter into UTF-8 binary bytes
+        const encoder = new TextEncoder();
+        const payloadText = secretText + SENTINEL_DELIMITER;
+        const payloadBytes = encoder.encode(payloadText);
+        const totalBits = payloadBytes.length * 8;
+
+        // Total usable channels (R, G, B channels, excluding Alpha)
+        const totalUsableChannels = width * height * 3;
+        if (totalBits > totalUsableChannels) {
+          throw new Error('Ukuran pesan melebihi kapasitas piksel gambar!');
+        }
+
+        // Embed bits into LSB of RGB channels
+        let bitIndex = 0;
+        for (let i = 0; i < data.length && bitIndex < totalBits; i++) {
+          // Skip Alpha channel (every 4th byte: index 3, 7, 11, ...)
+          if (i % 4 === 3) continue;
+
+          const byteIndex = Math.floor(bitIndex / 8);
+          const bitOffset = 7 - (bitIndex % 8); // Most Significant Bit first
+          const bit = (payloadBytes[byteIndex] >> bitOffset) & 1;
+
+          // Replace Least Significant Bit (clear last bit with 0xFE, then OR with bit)
+          data[i] = (data[i] & 0xFE) | bit;
+          bitIndex++;
+        }
+
+        // Put modified pixel data back on Canvas
+        offscreenCtx.putImageData(imgData, 0, 0);
+
+        // Export lossless PNG
+        offscreenCanvas.toBlob((blob) => {
+          if (!blob) throw new Error('Gagal mengekspor foto stego.');
+
+          // Generate download filename: [nama-file]-rahasia.png
+          const origName = state.encode.file.name.replace(/\.[^/.]+$/, "");
+          const downloadName = `${origName}-rahasia.png`;
+          const blobUrl = URL.createObjectURL(blob);
+
+          state.encode.lastProcessedBlobUrl = blobUrl;
+          state.encode.lastFileName = downloadName;
+
+          // Trigger automatic browser download
+          const downloadLink = document.createElement('a');
+          downloadLink.href = blobUrl;
+          downloadLink.download = downloadName;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          downloadLink.remove();
+
+          // Update Status Alert
+          encodeStatusAlert.className = 'mt-3 p-3 rounded-xl text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-2 border bg-emerald-950/40 border-emerald-500/50 text-emerald-300';
+          encodeStatusMessage.innerHTML = `
+            <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span><strong>Berhasil!</strong> ${payloadBytes.length - 9} karakter disembunyikan dalam <strong>${downloadName}</strong></span>
+          `;
+          encodeStatusAlert.classList.remove('hidden');
+          quickTestDecodeBtn.classList.remove('hidden');
+
+          sound.playSuccess();
+          showToast(`Selesai! File "${downloadName}" berhasil diunduh.`, 'success', 4500);
+
+        }, 'image/png');
+
+      } catch (err) {
+        console.error(err);
+        sound.playError();
+        showToast(err.message || 'Terjadi kesalahan saat memproses gambar.', 'error');
+      } finally {
+        encodeSpinner.classList.add('hidden');
+        encodeBtnIcon.classList.remove('hidden');
+        encodeBtnText.textContent = 'Proses & Unduh Foto (PNG)';
+        encodeBtn.disabled = false;
+      }
+    });
+
+    // Quick Test in Decode Column
+    quickTestDecodeBtn.addEventListener('click', async () => {
+      if (!state.encode.lastProcessedBlobUrl) return;
+      sound.playBlip(800, 'sine', 0.05);
+
+      // Fetch blob and feed directly into Decode pipeline
+      const res = await fetch(state.encode.lastProcessedBlobUrl);
+      const blob = await res.blob();
+      const file = new File([blob], state.encode.lastFileName, { type: 'image/png' });
+      
+      handleDecodeFile(file);
+      showToast('Gambar hasil encode otomatis dimuat ke Kolom Dekripsi!', 'info');
+
+      // Scroll smoothly to Decode column on mobile
+      decodeDropzone.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
+
+    // ========================================================
+    // COLUMN 2: DECODE LOGIC & UI
+    // ========================================================
+
+    // Handle Decode File Selection
+    function handleDecodeFile(file) {
+      if (!file) return;
+      if (!file.type.startsWith('image/')) {
+        showToast('Pilih file gambar berformat PNG/JPG', 'error');
+        sound.playError();
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          state.decode.file = file;
+          state.decode.img = img;
+          state.decode.width = img.naturalWidth;
+          state.decode.height = img.naturalHeight;
+
+          // Update UI
+          decodeImagePreview.src = e.target.result;
+          decodeFileName.textContent = file.name;
+          decodeResolution.textContent = `${img.naturalWidth} × ${img.naturalHeight} px`;
+          decodeFileSize.textContent = formatBytes(file.size);
+          decodeImageStatus.textContent = 'Foto siap diekstraksi';
+
+          decodeEmptyState.classList.add('hidden');
+          decodePreviewState.classList.remove('hidden');
+          decodeBtn.disabled = false;
+
+          // Reset previous decoded state
+          lockedStateContainer.classList.remove('hidden');
+          unlockedMessageContainer.classList.add('hidden');
+          decodedOutputText.textContent = '';
+          copyMessageBtn.disabled = true;
+          decodeStatusAlert.classList.add('hidden');
+
+          sound.playBlip(750, 'sine', 0.08);
+          showToast(`Foto rahasia dimuat: ${file.name}`, 'info');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Reset Decode Image
+    function resetDecodeImage() {
+      state.decode.file = null;
+      state.decode.img = null;
+      state.decode.width = 0;
+      state.decode.height = 0;
+      state.decode.decodedMessage = '';
+
+      decodeFileInput.value = '';
+      decodeImagePreview.src = '';
+      decodeEmptyState.classList.remove('hidden');
+      decodePreviewState.classList.add('hidden');
+      decodeImageStatus.textContent = 'Belum ada foto';
+      decodeBtn.disabled = true;
+
+      lockedStateContainer.classList.remove('hidden');
+      unlockedMessageContainer.classList.add('hidden');
+      decodedOutputText.textContent = '';
+      copyMessageBtn.disabled = true;
+      decodeStatusAlert.classList.add('hidden');
+
+      sound.playBlip(400, 'sine', 0.05);
+    }
+
+    removeDecodeImgBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetDecodeImage();
+    });
+
+    // Dropzone Events for Decode
+    decodeDropzone.addEventListener('click', () => decodeFileInput.click());
+    decodeFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleDecodeFile(e.target.files[0]);
+      }
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      decodeDropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        decodeDropzone.classList.add('border-cyan-400', 'bg-cyan-950/20', 'dropzone-active');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      decodeDropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        decodeDropzone.classList.remove('border-cyan-400', 'bg-cyan-950/20', 'dropzone-active');
+      });
+    });
+
+    decodeDropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length > 0) {
+        handleDecodeFile(dt.files[0]);
+      }
+    });
+
+
+    // --- LSB DECODING PROCESSOR ---
+    decodeBtn.addEventListener('click', async () => {
+      if (!state.decode.img) {
+        showToast('Unggah foto rahasia terlebih dahulu!', 'warning');
+        sound.playError();
+        return;
+      }
+
+      // UI Loading state
+      decodeBtn.disabled = true;
+      decodeSpinner.classList.remove('hidden');
+      decodeBtnIcon.classList.add('hidden');
+      decodeBtnText.textContent = 'Membaca Piksel Bit per Bit...';
+      sound.playBlip(600, 'sine', 0.05);
+
+      await new Promise(r => setTimeout(r, 60));
+
+      try {
+        const { width, height, img } = state.decode;
+        offscreenCanvas.width = width;
+        offscreenCanvas.height = height;
+        offscreenCtx.drawImage(img, 0, 0);
+
+        const imgData = offscreenCtx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+
+        const delimiterBytes = new TextEncoder().encode(SENTINEL_DELIMITER);
+        const delimiterLen = delimiterBytes.length;
+
+        let currentByte = 0;
+        let bitCount = 0;
+        const collectedBytes = [];
+        let foundDelimiter = false;
+
+        // Iterate through pixel data array (R, G, B channels, skip Alpha)
+        for (let i = 0; i < data.length; i++) {
+          if (i % 4 === 3) continue; // Skip Alpha
+
+          const bit = data[i] & 1;
+          currentByte = (currentByte << 1) | bit;
+          bitCount++;
+
+          if (bitCount === 8) {
+            collectedBytes.push(currentByte);
+            currentByte = 0;
+            bitCount = 0;
+
+            // Check if trailing bytes match SENTINEL_DELIMITER (###END###)
+            if (collectedBytes.length >= delimiterLen) {
+              let match = true;
+              const startIdx = collectedBytes.length - delimiterLen;
+              for (let d = 0; d < delimiterLen; d++) {
+                if (collectedBytes[startIdx + d] !== delimiterBytes[d]) {
+                  match = false;
+                  break;
+                }
+              }
+
+              if (match) {
+                foundDelimiter = true;
+                break; // Stop immediately once sentinel delimiter is found!
+              }
+            }
+
+            // Safety threshold to avoid excessive memory on non-stego pictures (e.g. 15MB)
+            if (collectedBytes.length > 15 * 1024 * 1024) {
+              break;
+            }
+          }
+        }
+
+        if (foundDelimiter) {
+          // Strip sentinel delimiter bytes
+          const messageBytes = new Uint8Array(collectedBytes.slice(0, collectedBytes.length - delimiterLen));
+          const decoder = new TextDecoder('utf-8', { fatal: false });
+          const secretMessage = decoder.decode(messageBytes);
+
+          state.decode.decodedMessage = secretMessage;
+
+          // Render output
+          lockedStateContainer.classList.add('hidden');
+          unlockedMessageContainer.classList.remove('hidden');
+          decodedOutputText.textContent = secretMessage;
+          decodedMeta.textContent = `${secretMessage.length.toLocaleString('id-ID')} karakter (${formatBytes(messageBytes.length)})`;
+          copyMessageBtn.disabled = false;
+
+          // Success alert
+          decodeStatusAlert.className = 'mt-3 p-3 rounded-xl text-xs font-mono flex items-center gap-2 border bg-emerald-950/40 border-emerald-500/50 text-emerald-300';
+          decodeStatusAlert.innerHTML = `
+            <svg class="w-4 h-4 text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Pesan rahasia berhasil diekstraksi tanpa cacat!</span>
+          `;
+          decodeStatusAlert.classList.remove('hidden');
+
+          sound.playDecodeSuccess();
+          showToast('Pesan rahasia berhasil diekstraksi!', 'success', 3500);
+
+        } else {
+          // No delimiter found
+          state.decode.decodedMessage = '';
+          lockedStateContainer.classList.remove('hidden');
+          unlockedMessageContainer.classList.add('hidden');
+          decodedOutputText.textContent = '';
+          copyMessageBtn.disabled = true;
+
+          // Graceful error notification
+          decodeStatusAlert.className = 'mt-3 p-3 rounded-xl text-xs font-mono flex items-start gap-2 border bg-red-950/40 border-red-500/50 text-red-300';
+          decodeStatusAlert.innerHTML = `
+            <svg class="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <div>
+              <p class="font-bold">Tidak ada pesan rahasia yang terdeteksi atau format rusak.</p>
+              <p class="text-slate-400 mt-1 font-sans text-[11px]">
+                Pastikan foto tersebut memang berisi pesan WhisperPixel dan tidak pernah dikompresi (misal: di-upload sebagai Dokumen di WhatsApp/Telegram, bukan gambar biasa).
+              </p>
+            </div>
+          `;
+          decodeStatusAlert.classList.remove('hidden');
+
+          sound.playError();
+          showToast('Tidak ada pesan rahasia yang terdeteksi atau format rusak.', 'error', 4500);
+        }
+
+      } catch (err) {
+        console.error(err);
+        sound.playError();
+        showToast('Terjadi kesalahan saat mengekstraksi data.', 'error');
+      } finally {
+        decodeSpinner.classList.add('hidden');
+        decodeBtnIcon.classList.remove('hidden');
+        decodeBtnText.textContent = 'Buka Pesan';
+        decodeBtn.disabled = false;
+      }
+    });
+
+    // Copy to Clipboard Action
+    copyMessageBtn.addEventListener('click', async () => {
+      const text = state.decode.decodedMessage;
+      if (!text) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        copyBtnText.textContent = 'Tersalin!';
+        copyIcon.innerHTML = `<polyline points="20 6 9 17 4 12"></polyline>`;
+        copyMessageBtn.classList.add('text-emerald-400', 'border-emerald-500/50');
+        sound.playBlip(900, 'sine', 0.06);
+        showToast('Pesan berhasil disalin ke clipboard!', 'success');
+
+        setTimeout(() => {
+          copyBtnText.textContent = 'Salin Teks';
+          copyIcon.innerHTML = `
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          `;
+          copyMessageBtn.classList.remove('text-emerald-400', 'border-emerald-500/50');
+        }, 2200);
+
+      } catch (e) {
+        // Fallback copy using textarea
+        const tempArea = document.createElement('textarea');
+        tempArea.value = text;
+        document.body.appendChild(tempArea);
+        tempArea.select();
+        document.execCommand('copy');
+        tempArea.remove();
+        showToast('Pesan berhasil disalin ke clipboard!', 'success');
+      }
+    });
+
+  </script>
+</body>
+</html>
